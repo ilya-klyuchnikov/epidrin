@@ -170,3 +170,10 @@ using (f : Type -> Type, g: Type -> Type, x : Type)
   (Monoidal (f x), Monoidal (g x)) => Monoidal (Cross f g x) where
     m0 = m0 :*: m0
     (x1 :*: y1) <++> (x2 :*: y2) = (x1 <++> x2) :*: (y1 <++> y2)
+
+using (m : Type -> Type, s : Type, t : Type)
+  monadDollar : Monad m => m (s -> t) -> m s -> m t
+  monadDollar mf ms
+    = do f <- mf
+         s <- ms
+         pure (f s)
