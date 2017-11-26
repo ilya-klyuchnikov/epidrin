@@ -92,8 +92,12 @@ Parse m i x => Parse m i (Id x) where
 gimme : Parse m i x => List i -> m x
 gimme {m} {i} {x} is = do (xv, _) <- un (blah {m = m} {i = i} {x = x}) is; pure xv
 
+commit : a -> List b -> a
+commit xv [] = xv
+commit xv _  = idris_crash "non-empty rest"
+
 reading : Monad m => StateT m (List i) x -> (List i) -> m x
-reading p is = do (xv, []) <- un p is; pure xv
+reading p is = do (xv, rest) <- un p is; pure (commit xv rest)
 
 interface Monad m => ParseFrom (m : Type -> Type) t i x | m, t where
   pF : t -> StateT m (List i) x
