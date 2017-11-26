@@ -196,19 +196,6 @@ index ((x', z') :>: xs) y = if (x' == y) then Just (0, z') else m' (index xs y) 
   m' _ = Nothing
 index _ _ = Nothing
 
--- Fun instances --
-
--- they are infinite - TODO - handle it later!
-Fun Zip where
-  (fz :<: f) <$$> (sz :<: s) = fz <$$> sz :<: f s
-  _          <$$> _          = MkZip
-  eta x = (eta x) :<: x
-
-Fun UTip where
-  (f :>: fs) <$$> (s :>: ss) = f s :>: fs <$$> ss
-  _          <$$> _          = nil
-  eta x = x :>: eta x
-
 -- Lookup operations --
 
 infixr 4 :=:
