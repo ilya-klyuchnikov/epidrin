@@ -6,8 +6,9 @@ import Functorial
 import Monadics
 import State
 import StateExtra
+import Utils
 
-%default total
+--%default total
 %access public export
 
 Parser : (Type -> Type) -> Type -> Type -> Type
@@ -106,3 +107,122 @@ interface Monad m => ParseFrom (m : Type -> Type) t i x | m, t where
 using (m : Type -> Type)
   (ParseFrom m s i (), Monoidal (m (t, List i))) => ParseFrom m (List (s,t)) i t where
     pF = (<!>) (\ (sv, tv) => eta tv </> pF sv )
+
+eol1 : Parser Maybe Char ()
+eol1 = fun {f = StateT Maybe (List Char)} () </> (pCon '\n' </> pMay (pCon '\r') <++> pCon '\r' </> pMay (pCon '\n'))
+
+------------------------
+-- For some strange reason, if those defs are put into a separate file,
+-- they don't work (some instances of interfaces are not found).
+
+data Bracket = ROUND | SQUARE
+
+Fun f => Funnel f Bracket (f Bracket) where
+  fun    = eta
+  funnel = id
+
+data Sep
+  = OpenSep Bracket
+  | CloseSep Bracket
+  | Tab
+  | EoL
+
+Fun f => Funnel f Sep (f Sep) where
+  fun    = eta
+  funnel = id
+
+Fun f => Funnel f (Bracket -> Sep) (f Bracket -> f Sep) where
+    funnel fg fx = funnel (fg <$$> fx)
+    fun g = funnel {f = f} {s = s} (eta g) where
+      s : Type
+      s = Bracket -> Sep
+
+Show Sep where
+  show (OpenSep  ROUND)  = "("
+  show (CloseSep ROUND)  = ")"
+  show (OpenSep  SQUARE) = "["
+  show (CloseSep SQUARE) = "]"
+  show Tab            = "!"
+  show EoL            = "\n"
+
+eol : Parser Maybe Char ()
+eol = eol1
+
+Parse Maybe Char Sep where
+  blah = p1 <++> p2 <++> p3 <++> p4 where
+          p01 : StateT Maybe (List Char) Bracket
+          p01 = fun {f = StateT Maybe (List Char)} ROUND </> pCon '('
+          p02 : StateT Maybe (List Char) Bracket
+          p02 = fun {f = StateT Maybe (List Char)} SQUARE </> pCon '['
+          p0  : StateT Maybe (List Char) Bracket
+          p0  = (p01 <++> p02)
+          p1  : StateT Maybe (List Char) Sep
+          p1  = fun {f = StateT Maybe (List Char)} OpenSep p0
+          p21 : StateT Maybe (List Char) Bracket
+          p21 = fun {f = StateT Maybe (List Char)} ROUND </> pCon ')'
+          p22 : StateT Maybe (List Char) Bracket
+          p22 = fun {f = StateT Maybe (List Char)} SQUARE </> pCon ']'
+          p2  : StateT Maybe (List Char) Sep
+          p2  = fun {f = StateT Maybe (List Char)} CloseSep (p21 <++> p22)
+          p3  : StateT Maybe (List Char) Sep
+          p3  = fun {f = StateT Maybe (List Char)} Tab </> pCon '!'
+          p4  : StateT Maybe (List Char) Sep
+          p4  = fun {f = StateT Maybe (List Char)} EoL </> eol
+
+Body : Type
+Body = Either Nat String
+
+nSpaces : Nat -> List Char
+nSpaces i = take i spaces
+
+bcons : Char -> Body -> Body
+bcons ' ' (Left i)   = Left (i + 1)
+bcons  c  (Left i)   = Right (cast cs') where
+  cs' : List Char
+  cs' = c :: (nSpaces i)
+bcons  c  (Right cs) = Right (cast cs') where
+  cs' : List Char
+  cs' = c :: (cast cs)
+
+-- questionable
+Fun f => Funnel f ((Body, b) -> (Body, b)) (f (Body, b) -> f (Body, b)) where
+  funnel fg fx = funnel (fg <$$> fx)
+  fun g = funnel {f = f} {s = s} (eta g) where
+    s : Type
+    s = (Body, b) -> (Body, b)
+
+Fun f => Funnel f (Char -> (Body, b) -> (Body, b)) (f Char -> f (Body, b) -> f (Body, b)) where
+  funnel fg fx = funnel (fg <$$> fx)
+  fun g = funnel {f = f} {s = s} (eta g) where
+    s : Type
+    s = Char -> (Body, b) -> (Body, b)
+
+mkPair : x -> y -> (x,y)
+mkPair x' y' = (x', y')
+
+-- TODO - totality
+Parse Maybe Char (Body, Sep) where
+  blah = p1 <++> p2 where
+       b : StateT Maybe (List Char) Sep
+       b = blah
+       a : z -> (Body, z)
+       a x = ((Left 0), x)
+       f1 : (Sep -> (Body, Sep)) -> StateT Maybe (List Char) Sep -> StateT Maybe (List Char) (Body, Sep)
+       f1 = fun {f = StateT Maybe (List Char)}
+       p1 : StateT Maybe (List Char) (Body, Sep)
+       p1 = f1 a b
+       f2 : (Char -> (Body, Sep) -> (Body, Sep)) -> (StateT Maybe (List Char) Char -> StateT Maybe (List Char) (Body, Sep) -> StateT Maybe (List Char) (Body, Sep))
+       f2 = fun {f = StateT Maybe (List Char)}
+       p2 : StateT Maybe (List Char) (Body, Sep)
+       p2 = f2 f' pI blah where
+         f' : Char -> (Body, Sep) -> (Body, Sep)
+         f' c (b, s) = (bcons c b,s)
+
+chunk : String -> Maybe (List (Body,Sep))
+chunk = reading (psq b p) . (cast {from = String} {to = List Char})  where
+  p : StateT Maybe (List Char) ()
+  p = pE
+  b : StateT Maybe (List Char) (Body, Sep)
+  b = blah
+  psq : StateT Maybe (List Char) (Body, Sep) -> StateT Maybe (List Char) () -> StateT Maybe (List Char) (List (Body, Sep))
+  psq = pSeq0
