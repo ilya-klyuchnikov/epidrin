@@ -11,8 +11,7 @@ track s = id
 --track = trace
 
 copies : Nat -> a -> List a
-copies Z x = []
-copies (S n) x = x :: (copies n x)
+copies i = take i . repeat
 
 digit : Char -> Maybe Int
 digit c = if (isDigit c) then Just ((ord c) - (ord '0')) else Nothing
@@ -34,3 +33,6 @@ test : Show x => (String -> x) -> IO ()
 test cook
   = do s <- getLines
        print (cook s)
+
+spaces : Stream Char
+spaces = repeat ' '
